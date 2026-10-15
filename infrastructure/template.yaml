@@ -1,0 +1,296 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  AegisShare - Secure File Sharing with Expiring Access and Audit Logs
+  College Capstone Project: Enterprise-grade Serverless Architecture
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Description: Deployment stage environment name.
+
+  BucketNamePrefix:
+    Type: String
+    Default: aegisshare-secure-vault
+    Description: Prefix for private encrypted S3 storage bucket.
+
+  PermissionsBoundaryArn:
+    Type: String
+    Default: ""
+    Description: Optional IAM Permissions Boundary ARN to enforce maximum permissions on the Lambda execution role.
+
+Conditions:
+  HasPermissionsBoundary: !Not [!Equals [!Ref PermissionsBoundaryArn, ""]]
+
+Globals:
+  Function:
+    Timeout: 15
+    MemorySize: 256
+    Runtime: python3.12
+    Architectures:
+      - x86_64
+    Environment:
+      Variables:
+        S3_BUCKET_NAME: !Ref EncryptedFilesBucket
+        FILES_TABLE_NAME: !Ref FilesMetadataTable
+        TOKENS_TABLE_NAME: !Ref ShareTokensTable
+        AUDIT_TABLE_NAME: !Ref AuditLogsTable
+        ENVIRONMENT: !Ref Environment
+
+Resources:
+  # =========================================================================
+  # 1. STORAGE: Amazon S3 (Encrypted & Strictly Private)
+  # =========================================================================
+  EncryptedFilesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${BucketNamePrefix}-${Environment}-${AWS::AccountId}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: AbortIncompleteMultipartUpload
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+      VersioningConfiguration:
+        Status: Enabled
+
+  # Enforce HTTPS-only transport policy on S3 bucket
+  EncryptedFilesBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref EncryptedFilesBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: EnforceTlsRequestsOnly
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !Sub "arn:aws:s3:::${EncryptedFilesBucket}"
+              - !Sub "arn:aws:s3:::${EncryptedFilesBucket}/*"
+            Condition:
+              Bool:
+                'aws:SecureTransport': 'false'
+
+  # =========================================================================
+  # 2. DATABASE: Amazon DynamoDB Tables
+  # =========================================================================
+  FilesMetadataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "aegisshare-files-${Environment}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: file_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: file_id
+          KeyType: HASH
+      SSESpecification:
+        SSEEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false
+
+  ShareTokensTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "aegisshare-tokens-${Environment}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: token_hash
+          AttributeType: S
+        - AttributeName: file_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: token_hash
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: FileIdIndex
+          KeySchema:
+            - AttributeName: file_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      SSESpecification:
+        SSEEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false
+
+  AuditLogsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "aegisshare-audit-logs-${Environment}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: event_id
+          AttributeType: S
+        - AttributeName: file_id
+          AttributeType: S
+        - AttributeName: timestamp_utc
+          AttributeType: S
+      KeySchema:
+        - AttributeName: event_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: FileIdEventsIndex
+          KeySchema:
+            - AttributeName: file_id
+              KeyType: HASH
+            - AttributeName: timestamp_utc
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      SSESpecification:
+        SSEEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false
+
+  # =========================================================================
+  # 3. API GATEWAY: HTTP API (V2) with CORS (Untagged to avoid stage-tagging permissions)
+  # =========================================================================
+  HttpApiGateway:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub "aegisshare-api-${Environment}"
+      ProtocolType: HTTP
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+          - PUT
+          - DELETE
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+          - X-Requested-With
+          - X-File-Name
+        MaxAge: 600
+
+  HttpApiGatewayStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref HttpApiGateway
+      StageName: !Ref Environment
+      AutoDeploy: true
+
+  HttpApiGatewayIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApiGateway
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt AegisShareApiFunction.Arn
+      PayloadFormatVersion: "2.0"
+
+  HttpApiProxyRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApiGateway
+      RouteKey: "ANY /{proxy+}"
+      Target: !Sub "integrations/${HttpApiGatewayIntegration}"
+
+  HttpApiRootRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApiGateway
+      RouteKey: "ANY /"
+      Target: !Sub "integrations/${HttpApiGatewayIntegration}"
+
+  HttpApiLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref AegisShareApiFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApiGateway}/*"
+
+  # =========================================================================
+  # 4. COMPUTE: AWS Lambda Functions (IAM Least-Privilege)
+  # =========================================================================
+  # Unified API Gateway Dispatcher Function
+  AegisShareApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: backend.handlers.api_dispatcher.lambda_handler
+      CodeUri: ../
+      Description: Core API Gateway handler routing requests to modular handlers.
+      PermissionsBoundary: !If [HasPermissionsBoundary, !Ref PermissionsBoundaryArn, !Ref "AWS::NoValue"]
+      Policies:
+        # S3 Least-Privilege Policy
+        - Statement:
+            - Sid: S3ObjectAccess
+              Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+                - s3:DeleteObject
+              Resource: !Sub "arn:aws:s3:::${EncryptedFilesBucket}/*"
+        # DynamoDB Least-Privilege Policy
+        - Statement:
+            - Sid: DynamoDBTableAccess
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+                - dynamodb:DeleteItem
+                - dynamodb:Scan
+                - dynamodb:Query
+              Resource:
+                - !GetAtt FilesMetadataTable.Arn
+                - !GetAtt ShareTokensTable.Arn
+                - !Sub "${ShareTokensTable.Arn}/index/*"
+                - !GetAtt AuditLogsTable.Arn
+                - !Sub "${AuditLogsTable.Arn}/index/*"
+
+  # CloudWatch Log Group for Lambda
+  AegisShareLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AegisShareApiFunction}"
+      RetentionInDays: 7
+
+Outputs:
+  ApiEndpointUrl:
+    Description: HTTP API Gateway base endpoint URL for AegisShare
+    Value: !Sub "https://${HttpApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"
+    Export:
+      Name: !Sub "${AWS::StackName}-ApiEndpoint"
+
+  EncryptedFilesBucketName:
+    Description: Amazon S3 Private Encrypted Storage Bucket
+    Value: !Ref EncryptedFilesBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-S3Bucket"
+
+  FilesMetadataTableName:
+    Description: DynamoDB Files Metadata Table Name
+    Value: !Ref FilesMetadataTable
+
+  ShareTokensTableName:
+    Description: DynamoDB Share Tokens Table Name (TTL Enabled)
+    Value: !Ref ShareTokensTable
+
+  AuditLogsTableName:
+    Description: DynamoDB Immutable Audit Logs Table Name
+    Value: !Ref AuditLogsTable

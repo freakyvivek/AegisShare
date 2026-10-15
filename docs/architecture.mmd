@@ -1,0 +1,112 @@
+graph TB
+    subgraph ClientTier ["Client Tier (Browser)"]
+        UI["AegisShare Dashboard SPA<br/>(Vanilla HTML5 / CSS3 / ES6 JavaScript)"]
+        Recipient["Recipient Download Portal<br/>(?token=... parameter)"]
+    end
+
+    subgraph ModeSelection ["Deployment / Execution Mode"]
+        direction TB
+        ModeLocal["MODE 1: Local Demonstration Mode<br/>(Verified Working on Windows)"]
+        ModeAWS["MODE 2: Production Serverless AWS Mode<br/>(IaC Template & Handlers Prepared)"]
+    end
+
+    UI --> ModeSelection
+    Recipient --> ModeSelection
+
+    %% Local Architecture
+    subgraph LocalStack ["Local Demonstration Stack (python backend/local_server.py)"]
+        LocalServer["Local HTTP Server<br/>(Python ThreadingHTTPServer, port 8000)"]
+        LocalStorage["Local Demo Storage<br/>(local_storage/files/)"]
+        LocalAudit["Append-Only Audit Log<br/>(local_storage/audit_log.jsonl)"]
+        LocalMemoryTokens["In-Memory Token Store<br/>(TokenService with SHA-256)"]
+
+        LocalServer --> LocalStorage
+        LocalServer --> LocalAudit
+        LocalServer --> LocalMemoryTokens
+    end
+
+    ModeLocal --> LocalServer
+
+    %% AWS Architecture
+    subgraph AWSCloud ["AWS Serverless Cloud Environment (infrastructure/template.yaml)"]
+        direction TB
+        ApiGw["Amazon API Gateway (HTTP API v2)<br/>(CORS Enabled, TLS 1.3)"]
+        
+        subgraph ComputeTier ["Compute Tier (AWS Lambda)"]
+            Dispatcher["api_dispatcher (Proxy Router)"]
+            UploadFn["upload_handler"]
+            ShareFn["share_handler"]
+            DownloadFn["download_handler"]
+            InspectFn["inspect_handler"]
+            RevokeFn["revoke_handler"]
+            AuditFn["audit_handler"]
+            TokensFn["tokens_handler"]
+            FilesFn["files_handler"]
+            HealthFn["health_handler"]
+
+            Dispatcher --> UploadFn
+            Dispatcher --> ShareFn
+            Dispatcher --> DownloadFn
+            Dispatcher --> InspectFn
+            Dispatcher --> RevokeFn
+            Dispatcher --> AuditFn
+            Dispatcher --> TokensFn
+            Dispatcher --> FilesFn
+            Dispatcher --> HealthFn
+        end
+
+        subgraph StorageTier ["Storage Tier (Amazon S3)"]
+            S3Bucket[("Private S3 Vault<br/>(SSE-AES256, Enforce TLS,<br/>Block Public Access, Lifecycle Rules)")]
+        end
+
+        subgraph DatabaseTier ["Database Tier (Amazon DynamoDB)"]
+            DdbFiles[("FilesMetadataTable<br/>(PK: file_id)")]
+            DdbTokens[("ShareTokensTable<br/>(PK: token_hash, TTL: ttl, GSI: FileIdIndex)")]
+            DdbAudit[("AuditLogsTable<br/>(PK: event_id, GSI: FileIdEventsIndex)")]
+        end
+
+        subgraph GovernanceTier ["Governance & Telemetry"]
+            IAM["IAM Execution Role<br/>(Least-Privilege Scoped Policies)"]
+            CW["Amazon CloudWatch Logs<br/>(Log Retention: 30 Days)"]
+        end
+
+        ApiGw --> Dispatcher
+        
+        UploadFn -.-> S3Bucket
+        UploadFn -.-> DdbFiles
+        UploadFn -.-> DdbAudit
+
+        ShareFn -.-> DdbFiles
+        ShareFn -.-> DdbTokens
+        ShareFn -.-> DdbAudit
+
+        DownloadFn -.-> DdbTokens
+        DownloadFn -.-> S3Bucket
+        DownloadFn -.-> DdbAudit
+
+        InspectFn -.-> DdbTokens
+        InspectFn -.-> DdbFiles
+
+        RevokeFn -.-> DdbTokens
+        RevokeFn -.-> DdbAudit
+
+        AuditFn -.-> DdbAudit
+        TokensFn -.-> DdbTokens
+        FilesFn -.-> DdbFiles
+
+        ComputeTier --- IAM
+        ComputeTier --- CW
+    end
+
+    ModeAWS --> ApiGw
+
+    %% Styling
+    classDef client fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#fff;
+    classDef local fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#fff;
+    classDef aws fill:#0c192c,stroke:#f59e0b,stroke-width:2px,color:#fff;
+    classDef db fill:#1e1b4b,stroke:#a855f7,stroke-width:2px,color:#fff;
+
+    class UI,Recipient client;
+    class LocalServer,LocalStorage,LocalAudit,LocalMemoryTokens local;
+    class ApiGw,Dispatcher,UploadFn,ShareFn,DownloadFn,InspectFn,RevokeFn,AuditFn,TokensFn,FilesFn,HealthFn,S3Bucket aws;
+    class DdbFiles,DdbTokens,DdbAudit db;

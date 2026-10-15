@@ -1,0 +1,25 @@
+AegisShare - Secure File Sharing Demo
+=====================================
+
+Project: Secure File Sharing with Expiring Access and Audit Logs
+Purpose: Sample non-sensitive text file for testing the AegisShare upload and sharing workflow.
+
+Document ID: DEMO-FILE-001
+Created for: College project demonstration
+Classification: Public test data
+
+This is a harmless sample file used to test:
+1. File upload to the application.
+2. Secure sharing-link generation.
+3. Downloading a shared file.
+4. Expiration and revocation checks.
+5. Audit-log event recording.
+
+Sample message:
+Hello! If you can read this message, the file upload and download workflow is working.
+
+Security note:
+This document contains no real credentials, personal information, or confidential data.
+Use it only as test data for the AegisShare project.
+
+End of sample file.

@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AegisShare | Secure File Sharing with Expiring Access & Audit Logs</title>
+  <meta name="description" content="College Capstone Project: Enterprise-grade secure file sharing featuring ephemeral access tokens, TTL expiration enforcement, and immutable audit logs.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <path d="M9 12l2 2 4-4"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h2>AegisShare</h2>
+          <span class="badge-tag">Zero-Knowledge Links</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <button class="nav-item active" data-view="view-overview" id="nav-overview">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"/>
+            <rect x="14" y="3" width="7" height="7"/>
+            <rect x="14" y="14" width="7" height="7"/>
+            <rect x="3" y="14" width="7" height="7"/>
+          </svg>
+          <span>Overview</span>
+        </button>
+
+        <button class="nav-item" data-view="view-vault" id="nav-vault">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+          </svg>
+          <span>File Vault & Upload</span>
+        </button>
+
+        <button class="nav-item" data-view="view-links" id="nav-links">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+          </svg>
+          <span>Share Links</span>
+        </button>
+
+        <button class="nav-item" data-view="view-audit" id="nav-audit">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+            <polyline points="10 9 9 9 8 9"/>
+          </svg>
+          <span>Audit Trail</span>
+        </button>
+
+        <button class="nav-item" data-view="view-recipient" id="nav-recipient">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          <span>Download Portal</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="server-badge" id="backend-status-badge">
+          <span class="status-dot ping-dot"></span>
+          <div class="server-info">
+            <span class="server-title">API Connection</span>
+            <span class="server-endpoint" id="active-api-host">http://127.0.0.1:8000</span>
+          </div>
+        </div>
+        <button class="config-toggle-btn" id="btn-toggle-config" title="Configure API Endpoint">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Top Header Bar -->
+      <header class="top-header">
+        <div class="header-titles">
+          <h1 id="page-heading">Security Overview</h1>
+          <p id="page-subheading">Active security controls, cryptographic tokens, and immutable audit telemetry.</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-secondary btn-sm" id="btn-refresh-all">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"/>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+            </svg>
+            <span>Sync</span>
+          </button>
+          <button class="btn btn-primary btn-sm" id="btn-quick-upload">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <span>Upload File</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Connection / API Settings Bar (Collapsible) -->
+      <section class="api-config-bar hidden" id="api-config-bar">
+        <div class="config-inner">
+          <label for="input-api-url"><strong>API Gateway / Local Host:</strong></label>
+          <input type="text" id="input-api-url" class="form-input" placeholder="http://127.0.0.1:8000" value="http://127.0.0.1:8000">
+          <button class="btn btn-primary btn-sm" id="btn-save-api-url">Save & Reconnect</button>
+          <button class="btn btn-secondary btn-sm" id="btn-reset-api-url">Reset Default</button>
+        </div>
+      </section>
+
+      <!-- VIEW 1: Overview Dashboard -->
+      <section class="view-panel active" id="view-overview">
+        <!-- Metric Cards -->
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-label">Stored Files</span>
+              <div class="metric-icon cyan">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                </svg>
+              </div>
+            </div>
+            <div class="metric-value" id="stat-total-files">0</div>
+            <div class="metric-caption">Stored in local demo vault</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-label">Active Share Links</span>
+              <div class="metric-icon green">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                </svg>
+              </div>
+            </div>
+            <div class="metric-value" id="stat-active-links">0</div>
+            <div class="metric-caption">Unexpired & unexhausted tokens</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-label">Recorded Audit Events</span>
+              <div class="metric-icon purple">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+              </div>
+            </div>
+            <div class="metric-value" id="stat-audit-events">0</div>
+            <div class="metric-caption">Immutable telemetry entries</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-header">
+              <span class="metric-label">Active Security Backend</span>
+              <div class="metric-icon amber">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                  <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                  <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                </svg>
+              </div>
+            </div>
+            <div class="metric-value text-sm" id="stat-storage-backend">local_demo_storage</div>
+            <div class="metric-caption">SHA-256 Hashes | UTC TTL</div>
+          </div>
+        </div>
+
+        <!-- Overview Quick Panels -->
+        <div class="dashboard-split">
+          <!-- Recent Activity Mini-Feed -->
+          <div class="card">
+            <div class="card-header">
+              <h3>Latest Security Audit Events</h3>
+              <button class="btn-link" onclick="switchView('view-audit')">View All →</button>
+            </div>
+            <div class="card-body">
+              <div class="recent-events-list" id="overview-events-list">
+                <div class="empty-state">
+                  <p>No audit events recorded yet.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Share Creation Banner -->
+          <div class="card quick-actions-card">
+            <div class="card-header">
+              <h3>Security Features At a Glance</h3>
+            </div>
+            <div class="card-body feature-list">
+              <div class="feature-item">
+                <div class="feature-bullet green"></div>
+                <div>
+                  <strong>Zero-Knowledge Token Storage</strong>
+                  <p>Plaintext access tokens are returned only to creator and never saved in database; only SHA-256 hashes are persisted.</p>
+                </div>
+              </div>
+              <div class="feature-item">
+                <div class="feature-bullet cyan"></div>
+                <div>
+                  <strong>UTC TTL Expiry Enforcement</strong>
+                  <p>Access requests past expiration timestamp are rejected immediately and logged as denied events.</p>
+                </div>
+              </div>
+              <div class="feature-item">
+                <div class="feature-bullet amber"></div>
+                <div>
+                  <strong>Download Ceilings & Revocation</strong>
+                  <p>Enforce single-use or limited downloads. Revoke access tokens on demand before expiry.</p>
+                </div>
+              </div>
+              <div class="feature-item">
+                <div class="feature-bullet purple"></div>
+                <div>
+                  <strong>Sanitized Audit Logging</strong>
+                  <p>Sensitive credentials and presigned query strings are scrubbed before writing to immutable logs.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 2: File Vault & Upload -->
+      <section class="view-panel" id="view-vault">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>Upload File to Secure Vault</h3>
+              <p class="text-muted">Files are stored securely with automated ID assignment and metadata tracking.</p>
+            </div>
+          </div>
+          <div class="card-body">
+            <!-- Dropzone -->
+            <div class="upload-dropzone" id="upload-dropzone">
+              <input type="file" id="file-input-element" class="hidden">
+              <div class="dropzone-content">
+                <div class="dropzone-icon">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                </div>
+                <h4>Drag & Drop file here, or <button type="button" class="btn-link" id="btn-browse-file">browse</button></h4>
+                <p class="dropzone-sub">Supported: any document, PDF, code, or binary (up to 50 MB for demo)</p>
+              </div>
+
+              <!-- Uploading progress state -->
+              <div class="upload-progress-box hidden" id="upload-progress-box">
+                <div class="progress-details">
+                  <span id="upload-filename">Uploading...</span>
+                  <span id="upload-percent">0%</span>
+                </div>
+                <div class="progress-bar-bg">
+                  <div class="progress-bar-fill" id="upload-bar-fill"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Upload Feedback Message -->
+            <div class="alert-box hidden" id="upload-alert-box"></div>
+          </div>
+        </div>
+
+        <!-- Files List Table -->
+        <div class="card mt-4">
+          <div class="card-header">
+            <div>
+              <h3>Files in Vault</h3>
+              <p class="text-muted">Currently stored files ready for expiring link creation.</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="btn-refresh-files">Refresh Vault</button>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="data-table" id="table-files">
+                <thead>
+                  <tr>
+                    <th>File ID</th>
+                    <th>Original Filename</th>
+                    <th>Size</th>
+                    <th>Content Type</th>
+                    <th>Uploaded At (UTC)</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-files">
+                  <tr>
+                    <td colspan="6" class="text-center py-4 text-muted">Loading vault files...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 3: Share Links Management -->
+      <section class="view-panel" id="view-links">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>Generate Expiring Access Link</h3>
+              <p class="text-muted">Create a cryptographically secure token with time and download limits.</p>
+            </div>
+          </div>
+          <div class="card-body">
+            <form id="form-create-share" class="share-form-grid">
+              <div class="form-group">
+                <label for="select-share-file">Target File <span class="req">*</span></label>
+                <select id="select-share-file" class="form-input" required>
+                  <option value="">-- Select a file from Vault --</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="select-share-ttl">Link Lifespan (TTL) <span class="req">*</span></label>
+                <select id="select-share-ttl" class="form-input">
+                  <option value="60">1 Minute (Quick Demo Expiry)</option>
+                  <option value="300">5 Minutes</option>
+                  <option value="1800">30 Minutes</option>
+                  <option value="3600" selected>1 Hour</option>
+                  <option value="86400">24 Hours</option>
+                  <option value="604800">7 Days</option>
+                  <option value="custom">Custom Seconds...</option>
+                </select>
+              </div>
+
+              <div class="form-group hidden" id="group-custom-ttl">
+                <label for="input-custom-ttl">Custom Seconds</label>
+                <input type="number" id="input-custom-ttl" class="form-input" min="5" placeholder="e.g. 120">
+              </div>
+
+              <div class="form-group">
+                <label for="select-max-downloads">Maximum Downloads (Optional)</label>
+                <select id="select-max-downloads" class="form-input">
+                  <option value="">Unlimited (Until TTL Expiry)</option>
+                  <option value="1">Single-Use (1 Download)</option>
+                  <option value="2">2 Downloads</option>
+                  <option value="5">5 Downloads</option>
+                  <option value="10">10 Downloads</option>
+                  <option value="custom">Custom Limit...</option>
+                </select>
+              </div>
+
+              <div class="form-group hidden" id="group-custom-downloads">
+                <label for="input-custom-downloads">Custom Max Downloads</label>
+                <input type="number" id="input-custom-downloads" class="form-input" min="1" placeholder="e.g. 3">
+              </div>
+
+              <div class="form-actions-full">
+                <button type="submit" class="btn btn-primary" id="btn-submit-share">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                  </svg>
+                  <span>Generate Secure Link</span>
+                </button>
+              </div>
+            </form>
+
+            <!-- Link Generated Output Panel -->
+            <div class="generated-link-box hidden" id="generated-link-box">
+              <div class="box-header">
+                <span class="badge-tag green">Link Created Successfully</span>
+                <span class="text-sm text-muted" id="gen-expires-tag"></span>
+              </div>
+              <div class="link-input-row">
+                <input type="text" id="input-generated-link" class="form-input code-font" readonly>
+                <button class="btn btn-secondary btn-copy" id="btn-copy-link">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                  </svg>
+                  <span>Copy</span>
+                </button>
+                <button class="btn btn-primary btn-sm" id="btn-test-link-in-portal">Test in Portal →</button>
+              </div>
+              <div class="token-security-notice">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="8" x2="12" y2="12"/>
+                  <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <span><strong>Security Guarantee:</strong> This plaintext token is displayed once. Only its SHA-256 hash is preserved in server memory.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active Share Links Table -->
+        <div class="card mt-4">
+          <div class="card-header">
+            <div>
+              <h3>Share Tokens Management</h3>
+              <p class="text-muted">Inspect status, download counts, and revoke active tokens on demand.</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="btn-refresh-tokens">Refresh Tokens</button>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="data-table" id="table-tokens">
+                <thead>
+                  <tr>
+                    <th>Token Hash Prefix</th>
+                    <th>File</th>
+                    <th>Status</th>
+                    <th>Downloads</th>
+                    <th>Expires At (UTC)</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-tokens">
+                  <tr>
+                    <td colspan="6" class="text-center py-4 text-muted">No share links generated yet.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 4: Audit Trail Explorer -->
+      <section class="view-panel" id="view-audit">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h3>Security & Compliance Audit Trail</h3>
+              <p class="text-muted">Immutable append-only telemetry tracking every upload, link creation, download, and rejection.</p>
+            </div>
+            <div class="filter-controls">
+              <select id="filter-audit-type" class="form-input form-input-sm">
+                <option value="">All Event Types</option>
+                <option value="FILE_UPLOAD">FILE_UPLOAD</option>
+                <option value="SHARE_LINK_CREATED">SHARE_LINK_CREATED</option>
+                <option value="DOWNLOAD_SUCCESS">DOWNLOAD_SUCCESS</option>
+                <option value="ACCESS_REJECTED">ACCESS_REJECTED</option>
+                <option value="TOKEN_REVOKED">TOKEN_REVOKED</option>
+              </select>
+
+              <select id="filter-audit-outcome" class="form-input form-input-sm">
+                <option value="">All Outcomes</option>
+                <option value="SUCCESS">SUCCESS</option>
+                <option value="DENIED">DENIED</option>
+                <option value="ERROR">ERROR</option>
+              </select>
+
+              <button class="btn btn-secondary btn-sm" id="btn-refresh-audit">Refresh Audit</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="data-table" id="table-audit">
+                <thead>
+                  <tr>
+                    <th>Timestamp (UTC)</th>
+                    <th>Event Type</th>
+                    <th>Outcome</th>
+                    <th>File ID</th>
+                    <th>Token Prefix</th>
+                    <th>Actor IP</th>
+                    <th>Reason / Details</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-audit">
+                  <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">Loading audit telemetry...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 5: Recipient Download Portal -->
+      <section class="view-panel" id="view-recipient">
+        <div class="portal-wrapper">
+          <div class="card portal-card">
+            <div class="portal-shield-icon">
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                <polyline points="9 12 11 14 15 10"/>
+              </svg>
+            </div>
+            <h2>Secure Download Portal</h2>
+            <p class="text-muted text-center mb-4">Enter a valid access token or open an expiring link to retrieve the shared file.</p>
+
+            <div class="portal-input-box">
+              <label for="input-recipient-token">Access Token:</label>
+              <div class="input-with-button">
+                <input type="text" id="input-recipient-token" class="form-input code-font" placeholder="Paste raw share token here...">
+                <button class="btn btn-secondary" id="btn-inspect-token">Inspect Token</button>
+              </div>
+            </div>
+
+            <!-- Token Status & File Preview Box -->
+            <div class="token-inspection-result hidden" id="token-inspect-box">
+              <div class="inspection-header">
+                <span class="badge-tag" id="badge-token-status">VALID</span>
+                <span class="text-sm" id="portal-countdown-timer">Checking expiry...</span>
+              </div>
+
+              <div class="file-summary-grid">
+                <div class="summary-item">
+                  <span class="summary-label">Filename:</span>
+                  <span class="summary-val font-semibold" id="portal-filename">—</span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">File Size:</span>
+                  <span class="summary-val" id="portal-filesize">—</span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">Expires At:</span>
+                  <span class="summary-val text-sm" id="portal-expiry-utc">—</span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">Downloads Left:</span>
+                  <span class="summary-val" id="portal-downloads-remaining">—</span>
+                </div>
+              </div>
+
+              <div class="portal-action-area">
+                <button class="btn btn-primary btn-lg w-full" id="btn-portal-download">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  <span>Download File Now</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Portal Error Box -->
+            <div class="alert-box danger hidden" id="portal-error-box"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

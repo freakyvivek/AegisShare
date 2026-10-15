@@ -1,0 +1,22 @@
+# AWS SAM Configuration for AegisShare
+# Configures deployment parameters, environment defaults, and safety checks.
+
+version = 0.1
+
+[default]
+[default.build.parameters]
+template_file = "infrastructure/template.yaml"
+
+[default.validate.parameters]
+template_file = "infrastructure/template.yaml"
+lint = true
+
+[default.deploy.parameters]
+stack_name = "aegisshare-app"
+resolve_s3 = true
+s3_prefix = "aegisshare-deployment"
+region = "ap-south-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "Environment=\"dev\""
+image_repositories = []
